@@ -1,0 +1,63 @@
+{
+  "manifest_version": 3,
+  "name": "EmptyDomai - AI Domain Generator",
+  "version": "1.0.0",
+  "description": "Generate smart domain names with AI, check availability in real-time, and save your favorites.",
+  "permissions": [
+    "storage",
+    "contextMenus",
+    "activeTab",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://*.openai.com/*",
+    "https://api.domainr.com/*",
+    "https://domain-availability.whoisxmlapi.com/*",
+    "https://cloudflare-dns.com/*",
+    "https://rdap.verisign.com/*",
+    "https://rdap.publicinterestregistry.org/*",
+    "https://rdap.nic.io/*",
+    "https://rdap.nic.ai/*",
+    "https://rdap.nic.co/*"
+  ],
+  "background": {
+    "service_worker": "src/background/index.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "EmptyDomai"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["src/content/index.js"],
+      "css": []
+    }
+  ],
+  "options_page": "options.html",
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "oauth2": {
+    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile"
+    ]
+  },
+  "key": ""
+}
