@@ -11,6 +11,9 @@
   ],
   "host_permissions": [
     "https://*.openai.com/*",
+    "https://api.stability.ai/*",
+    "https://api.replicate.com/*",
+    "https://generativelanguage.googleapis.com/*",
     "https://api.domainr.com/*",
     "https://domain-availability.whoisxmlapi.com/*",
     "https://cloudflare-dns.com/*",

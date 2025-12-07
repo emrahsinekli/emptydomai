@@ -18,7 +18,12 @@ interface SettingsTabProps {
 
 export const SettingsTab: React.FC<SettingsTabProps> = ({ onLogout, user }) => {
   const [apiKeys, setApiKeys] = useState<APIKeys>({});
-  const [showOpenAI, setShowOpenAI] = useState(false);
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({
+    openai: false,
+    gemini: false,
+    stability: false,
+    replicate: false,
+  });
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{
     type: 'success' | 'error';
@@ -113,85 +118,125 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onLogout, user }) => {
             Your API keys are stored locally and never sent to our servers.
           </div>
 
-          {/* OpenAI API Key */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              OpenAI API Key
-            </label>
-            <div className="flex gap-2">
-              <div className="flex-1 relative">
-                <input
-                  type={showOpenAI ? 'text' : 'password'}
-                  value={apiKeys.openai || ''}
-                  onChange={(e) =>
-                    setApiKeys((prev) => ({ ...prev, openai: e.target.value }))
-                  }
-                  placeholder="sk-..."
-                  className="input-field pr-10"
-                />
+          {/* API Key Input Component */}
+          {[
+            {
+              key: 'openai' as const,
+              label: 'OpenAI API Key (DALL-E)',
+              placeholder: 'sk-...',
+              helpText: 'Get your API key from',
+              helpUrl: 'https://platform.openai.com/api-keys',
+              helpLinkText: 'OpenAI Dashboard',
+            },
+            {
+              key: 'gemini' as const,
+              label: 'Google Gemini API Key',
+              placeholder: 'AIza...',
+              helpText: 'Get your API key from',
+              helpUrl: 'https://aistudio.google.com/app/apikey',
+              helpLinkText: 'Google AI Studio',
+            },
+            {
+              key: 'stability' as const,
+              label: 'Stability AI API Key',
+              placeholder: 'sk-...',
+              helpText: 'Get your API key from',
+              helpUrl: 'https://platform.stability.ai/account/keys',
+              helpLinkText: 'Stability AI Platform',
+            },
+            {
+              key: 'replicate' as const,
+              label: 'Replicate API Key',
+              placeholder: 'r8_...',
+              helpText: 'Get your API key from',
+              helpUrl: 'https://replicate.com/account/api-tokens',
+              helpLinkText: 'Replicate Dashboard',
+            },
+          ].map((provider) => (
+            <div key={provider.key}>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {provider.label}
+              </label>
+              <div className="flex gap-2">
+                <div className="flex-1 relative">
+                  <input
+                    type={showKeys[provider.key] ? 'text' : 'password'}
+                    value={apiKeys[provider.key] || ''}
+                    onChange={(e) =>
+                      setApiKeys((prev) => ({ ...prev, [provider.key]: e.target.value }))
+                    }
+                    placeholder={provider.placeholder}
+                    className="input-field pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowKeys((prev) => ({
+                        ...prev,
+                        [provider.key]: !prev[provider.key],
+                      }))
+                    }
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showKeys[provider.key] ? (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                        className="w-4 h-4"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        strokeWidth={2}
+                        stroke="currentColor"
+                        className="w-4 h-4"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
                 <button
-                  type="button"
-                  onClick={() => setShowOpenAI(!showOpenAI)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  onClick={() => handleSaveAPIKey(provider.key, apiKeys[provider.key] || '')}
+                  disabled={isSaving}
+                  className="btn-primary px-3"
                 >
-                  {showOpenAI ? (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-4 h-4"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-                      />
-                    </svg>
-                  ) : (
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      strokeWidth={2}
-                      stroke="currentColor"
-                      className="w-4 h-4"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                      />
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                      />
-                    </svg>
-                  )}
+                  Save
                 </button>
               </div>
-              <button
-                onClick={() => handleSaveAPIKey('openai', apiKeys.openai || '')}
-                disabled={isSaving}
-                className="btn-primary px-3"
-              >
-                Save
-              </button>
+              <p className="text-xs text-gray-500 mt-1">
+                {provider.helpText}{' '}
+                <a
+                  href={provider.helpUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary-600 hover:underline"
+                >
+                  {provider.helpLinkText}
+                </a>
+              </p>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Get your API key from{' '}
-              <a
-                href="https://platform.openai.com/api-keys"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary-600 hover:underline"
-              >
-                OpenAI Dashboard
-              </a>
-            </p>
-          </div>
+          ))}
 
           {/* Save message */}
           {saveMessage && (

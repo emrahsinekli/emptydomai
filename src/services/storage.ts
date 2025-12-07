@@ -126,6 +126,12 @@ export const validateAPIKeyFormat = (provider: keyof APIKeys, key: string): bool
     case 'gemini':
       // Google API keys are typically 39 characters
       return key.length >= 30;
+    case 'stability':
+      // Stability AI keys start with 'sk-'
+      return key.startsWith('sk-') && key.length > 20;
+    case 'replicate':
+      // Replicate keys start with 'r8_'
+      return key.startsWith('r8_') && key.length > 20;
     case 'domainApi':
       // Generic validation
       return key.length >= 10;

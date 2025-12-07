@@ -210,6 +210,8 @@ export interface APIKeys {
   openai?: string;
   anthropic?: string;
   gemini?: string;
+  stability?: string;
+  replicate?: string;
   domainApi?: string;
 }
 

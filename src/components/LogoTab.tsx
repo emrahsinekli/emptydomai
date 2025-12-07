@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { LogoStyle, LogoShape, GeneratedLogo, LogoVariant } from '../types';
 import {
   generateLogo,
@@ -8,7 +8,10 @@ import {
   LOGO_STYLE_OPTIONS,
   LOGO_SHAPE_OPTIONS,
   INDUSTRY_OPTIONS,
+  LOGO_AI_PROVIDERS,
+  LogoAIProvider,
 } from '../services/logo';
+import { hasAPIKey } from '../services/storage';
 
 export const LogoTab: React.FC = () => {
   // Form state
@@ -20,6 +23,11 @@ export const LogoTab: React.FC = () => {
   const [secondaryColor, setSecondaryColor] = useState('#818cf8');
   const [industry, setIndustry] = useState('');
   const [keywords, setKeywords] = useState('');
+
+  // AI Provider state
+  const [selectedProvider, setSelectedProvider] = useState<LogoAIProvider>('openai');
+  const [selectedModel, setSelectedModel] = useState<string>('');
+  const [availableProviders, setAvailableProviders] = useState<LogoAIProvider[]>([]);
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -33,9 +41,49 @@ export const LogoTab: React.FC = () => {
   // Selected size category for preview
   const [selectedCategory, setSelectedCategory] = useState<'standard' | 'favicon' | 'social'>('standard');
 
+  // Check which API keys are configured
+  useEffect(() => {
+    const checkAPIKeys = async () => {
+      const available: LogoAIProvider[] = [];
+
+      for (const provider of LOGO_AI_PROVIDERS) {
+        const hasKey = await hasAPIKey(provider.apiKeyName);
+        if (hasKey) {
+          available.push(provider.id);
+        }
+      }
+
+      setAvailableProviders(available);
+
+      // Select first available provider
+      if (available.length > 0 && !available.includes(selectedProvider)) {
+        setSelectedProvider(available[0]);
+      }
+    };
+
+    checkAPIKeys();
+  }, []);
+
+  // Update model when provider changes
+  useEffect(() => {
+    const provider = LOGO_AI_PROVIDERS.find(p => p.id === selectedProvider);
+    if (provider?.models?.length) {
+      setSelectedModel(provider.models[0].id);
+    } else {
+      setSelectedModel('');
+    }
+  }, [selectedProvider]);
+
+  const currentProvider = LOGO_AI_PROVIDERS.find(p => p.id === selectedProvider);
+
   const handleGenerate = async () => {
     if (!brandName.trim()) {
       setError('Please enter a brand name');
+      return;
+    }
+
+    if (!availableProviders.includes(selectedProvider)) {
+      setError(`${currentProvider?.name} API key not configured. Go to Settings to add it.`);
       return;
     }
 
@@ -43,16 +91,20 @@ export const LogoTab: React.FC = () => {
     setError(null);
 
     try {
-      const logo = await generateLogo({
-        brandName: brandName.trim(),
-        tagline: tagline.trim() || undefined,
-        style,
-        shape,
-        primaryColor,
-        secondaryColor,
-        industry: industry || undefined,
-        keywords: keywords ? keywords.split(',').map(k => k.trim()).filter(Boolean) : undefined,
-      });
+      const logo = await generateLogo(
+        {
+          brandName: brandName.trim(),
+          tagline: tagline.trim() || undefined,
+          style,
+          shape,
+          primaryColor,
+          secondaryColor,
+          industry: industry || undefined,
+          keywords: keywords ? keywords.split(',').map(k => k.trim()).filter(Boolean) : undefined,
+        },
+        selectedProvider,
+        selectedModel || undefined
+      );
 
       setGeneratedLogo(logo);
 
@@ -93,12 +145,64 @@ export const LogoTab: React.FC = () => {
     <div className="flex flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="px-4 py-3 border-b border-gray-200 bg-white">
-        <h2 className="text-lg font-semibold text-gray-900">Logo Generator</h2>
-        <p className="text-xs text-gray-500">Create AI-powered logos for your brand</p>
+        <h2 className="text-lg font-semibold text-gray-900">AI Logo Generator</h2>
+        <p className="text-xs text-gray-500">Create logos with DALL-E, Stable Diffusion, Gemini & more</p>
       </div>
 
       {/* Scrollable Content */}
       <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4">
+        {/* AI Provider Selection */}
+        <div>
+          <label className="block text-xs font-medium text-gray-700 mb-2">
+            AI Model
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {LOGO_AI_PROVIDERS.map((provider) => {
+              const isAvailable = availableProviders.includes(provider.id);
+              return (
+                <button
+                  key={provider.id}
+                  onClick={() => isAvailable && setSelectedProvider(provider.id)}
+                  disabled={!isAvailable}
+                  className={`px-3 py-2 text-left rounded-lg border transition-colors ${
+                    selectedProvider === provider.id
+                      ? 'border-primary-500 bg-primary-50'
+                      : isAvailable
+                      ? 'border-gray-200 hover:border-gray-300'
+                      : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <div className={`text-sm font-medium ${
+                    selectedProvider === provider.id ? 'text-primary-700' : 'text-gray-700'
+                  }`}>
+                    {provider.name}
+                  </div>
+                  <div className="text-[10px] text-gray-500 truncate">
+                    {isAvailable ? provider.description : 'API key required'}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Model selector for providers with multiple models */}
+          {currentProvider?.models && currentProvider.models.length > 0 && (
+            <div className="mt-2">
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="w-full px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+              >
+                {currentProvider.models.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
         {/* Brand Info Section */}
         <div className="space-y-3">
           <div>
@@ -256,9 +360,9 @@ export const LogoTab: React.FC = () => {
         {/* Generate Button */}
         <button
           onClick={handleGenerate}
-          disabled={isGenerating || !brandName.trim()}
+          disabled={isGenerating || !brandName.trim() || availableProviders.length === 0}
           className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-            isGenerating || !brandName.trim()
+            isGenerating || !brandName.trim() || availableProviders.length === 0
               ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
               : 'bg-primary-600 text-white hover:bg-primary-700'
           }`}
@@ -266,7 +370,7 @@ export const LogoTab: React.FC = () => {
           {isGenerating ? (
             <>
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Generating Logo...
+              Generating with {currentProvider?.name}...
             </>
           ) : (
             <>
@@ -277,6 +381,13 @@ export const LogoTab: React.FC = () => {
             </>
           )}
         </button>
+
+        {/* No API Keys Warning */}
+        {availableProviders.length === 0 && (
+          <div className="px-3 py-2 text-sm text-yellow-700 bg-yellow-50 rounded-lg">
+            No AI provider configured. Go to Settings to add your API keys for DALL-E, Stable Diffusion, Gemini, or Replicate.
+          </div>
+        )}
 
         {/* Generated Logo Display */}
         {generatedLogo && (
@@ -299,6 +410,9 @@ export const LogoTab: React.FC = () => {
                   />
                 ) : null}
               </div>
+              <p className="text-[10px] text-gray-400 mt-1">
+                Generated with {currentProvider?.name}
+              </p>
             </div>
 
             {/* Loading sizes */}
