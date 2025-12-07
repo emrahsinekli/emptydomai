@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import type { APIKeys, UserSettings } from '../types';
+import type { APIKeys } from '../types';
 import {
   getAPIKeys,
   saveAPIKeys,
   validateAPIKeyFormat,
 } from '../services/storage';
-import { AVAILABLE_TLDS, DOMAIN_STYLE_OPTIONS, LANGUAGE_OPTIONS, DEFAULT_USER_SETTINGS } from '../types';
 
 interface SettingsTabProps {
   onLogout: () => void;

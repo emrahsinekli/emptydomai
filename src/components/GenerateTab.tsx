@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import type { SearchParams, DomainStyle, DomainLength } from '../types';
+import type { SearchParams, DomainStyle, DomainLength, DomainResult } from '../types';
 import {
   AVAILABLE_TLDS,
   DOMAIN_STYLE_OPTIONS,
@@ -9,6 +9,7 @@ import {
 import { DomainCard } from './DomainCard';
 import { useDomainGenerator } from '../hooks/useDomainGenerator';
 import { useFavorites } from '../hooks/useFavorites';
+import { performDeepResearch } from '../services/domainResearch';
 
 export const GenerateTab: React.FC = () => {
   const [keywords, setKeywords] = useState('');
@@ -26,6 +27,8 @@ export const GenerateTab: React.FC = () => {
   );
   const [showOnlyAvailable, setShowOnlyAvailable] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [researchingDomain, setResearchingDomain] = useState<string | null>(null);
+  const [researchedResults, setResearchedResults] = useState<Map<string, DomainResult>>(new Map());
 
   const {
     results,
@@ -38,6 +41,28 @@ export const GenerateTab: React.FC = () => {
   } = useDomainGenerator();
 
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  // Handle deep research for a single domain
+  const handleDeepResearch = async (result: DomainResult) => {
+    setResearchingDomain(result.fullDomain);
+    try {
+      const researched = await performDeepResearch(
+        result,
+        keywords.split(/[,\s]+/).filter(Boolean),
+        (status) => console.log('Research status:', status)
+      );
+      setResearchedResults(prev => new Map(prev).set(result.fullDomain, researched));
+    } catch (err) {
+      console.error('Research error:', err);
+    } finally {
+      setResearchingDomain(null);
+    }
+  };
+
+  // Get result with research data if available
+  const getEnhancedResult = (result: DomainResult): DomainResult => {
+    return researchedResults.get(result.fullDomain) || result;
+  };
 
   // Check for pending context generation (from context menu)
   useEffect(() => {
@@ -285,17 +310,22 @@ export const GenerateTab: React.FC = () => {
 
           {/* Results List */}
           <div className="flex-1 overflow-y-auto p-4 space-y-2">
-            {results.map((result, index) => (
-              <DomainCard
-                key={`${result.fullDomain}-${index}`}
-                result={result}
-                isFavorite={isFavorite(result.fullDomain)}
-                onToggleFavorite={() =>
-                  toggleFavorite(result.domain, result.tld)
-                }
-                showOnlyAvailable={showOnlyAvailable}
-              />
-            ))}
+            {results.map((result, index) => {
+              const enhancedResult = getEnhancedResult(result);
+              return (
+                <DomainCard
+                  key={`${result.fullDomain}-${index}`}
+                  result={enhancedResult}
+                  isFavorite={isFavorite(result.fullDomain)}
+                  onToggleFavorite={() =>
+                    toggleFavorite(result.domain, result.tld)
+                  }
+                  onDeepResearch={handleDeepResearch}
+                  isResearching={researchingDomain === result.fullDomain}
+                  showOnlyAvailable={showOnlyAvailable}
+                />
+              );
+            })}
           </div>
         </div>
       )}

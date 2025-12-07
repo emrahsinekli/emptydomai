@@ -5,9 +5,10 @@ import { GenerateTab } from '../components/GenerateTab';
 import { HistoryTab } from '../components/HistoryTab';
 import { FavoritesTab } from '../components/FavoritesTab';
 import { SettingsTab } from '../components/SettingsTab';
+import { LogoTab } from '../components/LogoTab';
 import { hasAPIKey } from '../services/storage';
 
-type Tab = 'generate' | 'history' | 'favorites' | 'settings';
+type Tab = 'generate' | 'logo' | 'history' | 'favorites' | 'settings';
 
 export const App: React.FC = () => {
   const { user, isLoading, error, isAuthenticated, login, logout } = useAuth();
@@ -46,7 +47,7 @@ export const App: React.FC = () => {
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     {
       id: 'generate',
-      label: 'Generate',
+      label: 'Domains',
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -59,7 +60,27 @@ export const App: React.FC = () => {
           <path
             strokeLinecap="round"
             strokeLinejoin="round"
-            d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"
+            d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: 'logo',
+      label: 'Logo',
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+          className="w-4 h-4"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
           />
         </svg>
       ),
@@ -196,6 +217,7 @@ export const App: React.FC = () => {
       {/* Tab Content */}
       <main className="flex-1 overflow-hidden">
         {activeTab === 'generate' && <GenerateTab />}
+        {activeTab === 'logo' && <LogoTab />}
         {activeTab === 'history' && <HistoryTab />}
         {activeTab === 'favorites' && <FavoritesTab />}
         {activeTab === 'settings' && <SettingsTab onLogout={logout} user={user} />}

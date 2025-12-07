@@ -18,7 +18,17 @@
     "https://rdap.publicinterestregistry.org/*",
     "https://rdap.nic.io/*",
     "https://rdap.nic.ai/*",
-    "https://rdap.nic.co/*"
+    "https://rdap.nic.co/*",
+    "https://www.reddit.com/*",
+    "https://hn.algolia.com/*",
+    "https://www.producthunt.com/*",
+    "https://index.commoncrawl.org/*",
+    "https://openpagerank.com/*",
+    "https://sedo.com/*",
+    "https://www.afternic.com/*",
+    "https://dan.com/*",
+    "https://auctions.godaddy.com/*",
+    "https://*/*"
   ],
   "background": {
     "service_worker": "src/background/index.js",

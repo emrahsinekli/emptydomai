@@ -33,7 +33,6 @@ import type {
   SearchParams,
   DomainResult,
   Favorite,
-  DEFAULT_USER_SETTINGS
 } from '../types';
 
 // Firebase configuration - Replace with your actual config

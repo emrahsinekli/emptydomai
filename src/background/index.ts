@@ -4,7 +4,6 @@ import type {
   SearchParams,
   DomainResult,
   User,
-  DEFAULT_USER_SETTINGS,
 } from '../types';
 import { generateDomains, generateDomainsFromContent } from '../services/ai';
 import { checkDomainsAvailability } from '../services/domain';
@@ -14,7 +13,6 @@ import {
   getCurrentUser,
   createUserDocument,
   getUserDocument,
-  saveSearchRecord,
   getSearchHistory,
   addFavorite,
   removeFavoriteByDomain,
@@ -27,7 +25,7 @@ import {
   getUserData,
   clearUserData,
 } from '../services/storage';
-import { DEFAULT_USER_SETTINGS as defaultSettings } from '../types';
+import { DEFAULT_USER_SETTINGS } from '../types';
 
 // Initialize Firebase
 initializeFirebase();
@@ -264,7 +262,7 @@ async function handleLogin(): Promise<ExtensionResponse<User>> {
     const firebaseUser = await signInWithGoogle(token);
 
     // Create or get user document
-    const user = await createUserDocument(firebaseUser, defaultSettings);
+    const user = await createUserDocument(firebaseUser, DEFAULT_USER_SETTINGS);
 
     // Cache user data locally
     await saveUserData(user);

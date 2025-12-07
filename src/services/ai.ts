@@ -170,7 +170,7 @@ export async function generateDomains(
 // Generate domains from content/context
 export async function generateDomainsFromContent(
   content: string,
-  provider: AIProvider = 'openai'
+  _provider: AIProvider = 'openai'
 ): Promise<string[]> {
   const apiKey = await getAPIKey('openai');
   if (!apiKey) {
