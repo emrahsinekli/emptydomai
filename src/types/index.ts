@@ -84,6 +84,7 @@ export interface DomainResult {
   socialMentions?: SocialMention[];
   whoisData?: WhoisData;
   researchStatus?: ResearchStatus;
+  appStoreResults?: AppStoreSearchResult;
 }
 
 // WHOIS data for taken domains
@@ -102,6 +103,34 @@ export interface ResearchStatus {
   alternativesChecked: boolean;
   socialChecked: boolean;
   whoisChecked: boolean;
+  appStoreChecked: boolean;
+}
+
+// App Store search results
+export type AppStorePlatform = 'ios' | 'android';
+
+export interface AppStoreResult {
+  id: string;
+  name: string;
+  platform: AppStorePlatform;
+  developer: string;
+  developerUrl?: string;
+  icon: string;
+  rating?: number;
+  ratingCount?: number;
+  price: string;
+  url: string;
+  category?: string;
+  description?: string;
+  similarity: number; // 0-100 similarity score
+}
+
+export interface AppStoreSearchResult {
+  query: string;
+  iosApps: AppStoreResult[];
+  androidApps: AppStoreResult[];
+  hasExactMatch: boolean;
+  hasSimilarApps: boolean;
 }
 
 export interface RegistrarLink {
@@ -234,6 +263,9 @@ export type MessageType =
   | 'CHECK_SOCIAL_MENTIONS'
   | 'CHECK_WHOIS'
   | 'DEEP_RESEARCH'
+  // App store search message types
+  | 'SEARCH_APP_STORES'
+  | 'CHECK_APP_NAME_AVAILABILITY'
   // Logo generation message types
   | 'GENERATE_LOGO'
   | 'RESIZE_LOGO'

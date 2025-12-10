@@ -9,6 +9,7 @@ import type {
   ResearchStatus,
 } from '../types';
 import { AVAILABLE_TLDS } from '../types';
+import { searchAppStores } from './appStoreSearch';
 
 // Rate limiting for research APIs
 const RESEARCH_RATE_LIMIT = {
@@ -644,6 +645,7 @@ export async function performDeepResearch(
     alternativesChecked: false,
     socialChecked: false,
     whoisChecked: false,
+    appStoreChecked: false,
   };
 
   const updatedResult = { ...result, researchStatus };
@@ -684,6 +686,11 @@ export async function performDeepResearch(
     onProgress?.('Searching social media mentions...');
     updatedResult.socialMentions = await checkSocialMentions(result.domain, keywords);
     researchStatus.socialChecked = true;
+
+    // For ALL domains: check app stores for similar app names
+    onProgress?.('Searching app stores for similar apps...');
+    updatedResult.appStoreResults = await searchAppStores(result.domain);
+    researchStatus.appStoreChecked = true;
 
     onProgress?.('Research complete!');
   } catch (error) {

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import type { DomainResult, SocialMention } from '../types';
+import type { DomainResult, SocialMention, AppStoreResult } from '../types';
 import { getMarketplaceLinks } from '../services/domainResearch';
+import { getAppStoreSearchLinks, getSimilarityBadgeColor, getAppNameWarningLevel } from '../services/appStoreSearch';
 
 interface DomainCardProps {
   result: DomainResult;
@@ -32,6 +33,7 @@ export const DomainCard: React.FC<DomainCardProps> = ({
     socialMentions,
     whoisData,
     researchStatus,
+    appStoreResults,
   } = result;
 
   // Hide taken domains if showOnlyAvailable is true
@@ -73,7 +75,9 @@ export const DomainCard: React.FC<DomainCardProps> = ({
   };
 
   const hasResearchData =
-    backlinks || forSale || alternativeTlds?.length || socialMentions?.length || whoisData;
+    backlinks || forSale || alternativeTlds?.length || socialMentions?.length || whoisData || appStoreResults;
+
+  const appWarningLevel = appStoreResults ? getAppNameWarningLevel(appStoreResults) : null;
 
   const availableAlternatives = alternativeTlds?.filter(a => a.status === 'available') || [];
 
@@ -126,6 +130,22 @@ export const DomainCard: React.FC<DomainCardProps> = ({
           {status === 'taken' && availableAlternatives.length > 0 && (
             <span className="px-1.5 py-0.5 text-xs rounded bg-green-100 text-green-700 font-medium">
               {availableAlternatives.length} Alt
+            </span>
+          )}
+
+          {/* App Store warning badge */}
+          {appWarningLevel && appWarningLevel !== 'safe' && (
+            <span
+              className={`px-1.5 py-0.5 text-xs rounded font-medium ${
+                appWarningLevel === 'danger'
+                  ? 'bg-red-100 text-red-700'
+                  : appWarningLevel === 'warning'
+                  ? 'bg-orange-100 text-orange-700'
+                  : 'bg-yellow-100 text-yellow-700'
+              }`}
+              title="Similar app found"
+            >
+              {appWarningLevel === 'danger' ? 'App Exists' : 'Similar App'}
             </span>
           )}
         </div>
@@ -404,6 +424,92 @@ export const DomainCard: React.FC<DomainCardProps> = ({
               </div>
             </div>
           )}
+
+          {/* App Store Results */}
+          {appStoreResults && (appStoreResults.iosApps.length > 0 || appStoreResults.androidApps.length > 0) && (
+            <div className={`rounded-lg p-2 ${
+              appWarningLevel === 'danger' ? 'bg-red-50' :
+              appWarningLevel === 'warning' ? 'bg-orange-50' :
+              appWarningLevel === 'caution' ? 'bg-yellow-50' : 'bg-green-50'
+            }`}>
+              <h4 className={`font-medium text-xs mb-2 flex items-center gap-1 ${
+                appWarningLevel === 'danger' ? 'text-red-800' :
+                appWarningLevel === 'warning' ? 'text-orange-800' :
+                appWarningLevel === 'caution' ? 'text-yellow-800' : 'text-green-800'
+              }`}>
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                </svg>
+                App Store Check
+                {appStoreResults.hasExactMatch && (
+                  <span className="ml-1 px-1 py-0.5 text-[10px] bg-red-200 text-red-700 rounded">Exact Match!</span>
+                )}
+              </h4>
+
+              {/* iOS Apps */}
+              {appStoreResults.iosApps.length > 0 && (
+                <div className="mb-2">
+                  <div className="text-[10px] text-gray-500 mb-1 font-medium">iOS App Store</div>
+                  <div className="space-y-1">
+                    {appStoreResults.iosApps.slice(0, 3).map((app) => (
+                      <AppStoreItem key={app.id} app={app} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Android Apps */}
+              {appStoreResults.androidApps.length > 0 && (
+                <div>
+                  <div className="text-[10px] text-gray-500 mb-1 font-medium">Google Play</div>
+                  <div className="space-y-1">
+                    {appStoreResults.androidApps.slice(0, 3).map((app) => (
+                      <AppStoreItem key={app.id} app={app} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Search Links */}
+              <div className="mt-2 pt-2 border-t border-gray-200 flex gap-2">
+                {(() => {
+                  const links = getAppStoreSearchLinks(domain);
+                  return (
+                    <>
+                      <a
+                        href={links.ios}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] px-2 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      >
+                        Search App Store
+                      </a>
+                      <a
+                        href={links.android}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] px-2 py-0.5 rounded bg-gray-200 text-gray-700 hover:bg-gray-300"
+                      >
+                        Search Play Store
+                      </a>
+                    </>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
+          {/* No App Found - Safe */}
+          {appStoreResults && appStoreResults.iosApps.length === 0 && appStoreResults.androidApps.length === 0 && (
+            <div className="bg-green-50 rounded-lg p-2">
+              <h4 className="font-medium text-green-800 text-xs flex items-center gap-1">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                No similar apps found in app stores
+              </h4>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -440,6 +546,62 @@ const SocialMentionItem: React.FC<{ mention: SocialMention }> = ({ mention }) =>
           </div>
         )}
       </div>
+    </a>
+  );
+};
+
+// App Store Item Component
+const AppStoreItem: React.FC<{ app: AppStoreResult }> = ({ app }) => {
+  const similarityColor = getSimilarityBadgeColor(app.similarity);
+
+  return (
+    <a
+      href={app.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2 p-1.5 rounded bg-white hover:bg-gray-50 transition-colors border border-gray-100"
+    >
+      {/* App Icon */}
+      {app.icon ? (
+        <img
+          src={app.icon}
+          alt={app.name}
+          className="w-8 h-8 rounded-lg flex-shrink-0"
+        />
+      ) : (
+        <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center flex-shrink-0">
+          <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+        </div>
+      )}
+
+      {/* App Info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-1">
+          <span className="text-xs font-medium text-gray-900 truncate">{app.name}</span>
+          <span className={`px-1 py-0.5 text-[9px] rounded border ${similarityColor}`}>
+            {app.similarity}%
+          </span>
+        </div>
+        <div className="text-[10px] text-gray-500 truncate">
+          {app.developer}
+          {app.category && ` • ${app.category}`}
+        </div>
+        {app.rating !== undefined && (
+          <div className="text-[10px] text-yellow-600">
+            {'★'.repeat(Math.round(app.rating))}{'☆'.repeat(5 - Math.round(app.rating))}
+            <span className="text-gray-400 ml-1">{app.rating.toFixed(1)}</span>
+          </div>
+        )}
+      </div>
+
+      {/* Platform badge */}
+      <span className={`text-[9px] px-1 py-0.5 rounded ${
+        app.platform === 'ios' ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'
+      }`}>
+        {app.platform === 'ios' ? 'iOS' : 'Android'}
+      </span>
     </a>
   );
 };

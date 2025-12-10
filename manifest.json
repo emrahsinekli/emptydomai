@@ -31,6 +31,10 @@
     "https://www.afternic.com/*",
     "https://dan.com/*",
     "https://auctions.godaddy.com/*",
+    "https://itunes.apple.com/*",
+    "https://apps.apple.com/*",
+    "https://play.google.com/*",
+    "https://market.android.com/*",
     "https://*/*"
   ],
   "background": {
