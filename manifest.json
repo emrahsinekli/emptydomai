@@ -1,16 +1,21 @@
 {
   "manifest_version": 3,
-  "name": "EmptyDomai - AI Domain Generator",
-  "version": "1.0.0",
-  "description": "Generate smart domain names with AI, check availability in real-time, and save your favorites.",
+  "name": "EmptyDomai - AI Domain Generator & Bulk Checker",
+  "version": "1.2.0",
+  "description": "Generate AI-powered domain names, bulk check availability, verify brand presence across the web - all in one extension. No API key required to start checking domains!",
   "permissions": [
     "storage",
     "contextMenus",
     "activeTab",
-    "identity"
+    "identity",
+    "sidePanel",
+    "scripting"
   ],
   "host_permissions": [
     "https://*.openai.com/*",
+    "https://api.anthropic.com/*",
+    "https://generativelanguage.googleapis.com/*",
+    "https://api.groq.com/*",
     "https://api.domainr.com/*",
     "https://domain-availability.whoisxmlapi.com/*",
     "https://cloudflare-dns.com/*",
@@ -18,14 +23,16 @@
     "https://rdap.publicinterestregistry.org/*",
     "https://rdap.nic.io/*",
     "https://rdap.nic.ai/*",
-    "https://rdap.nic.co/*"
+    "https://rdap.nic.co/*",
+    "https://play.google.com/*",
+    "https://itunes.apple.com/*",
+    "https://apps.apple.com/*"
   ],
   "background": {
     "service_worker": "src/background/index.js",
     "type": "module"
   },
   "action": {
-    "default_popup": "popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -33,18 +40,14 @@
     },
     "default_title": "EmptyDomai"
   },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["src/content/index.js"],
-      "css": []
-    }
-  ],
   "options_page": "options.html",
   "web_accessible_resources": [
     {
@@ -53,11 +56,10 @@
     }
   ],
   "oauth2": {
-    "client_id": "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com",
+    "client_id": "989858667510-b3984isn5m87bpnbrarm3ii1s48rhsek.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/userinfo.email",
       "https://www.googleapis.com/auth/userinfo.profile"
     ]
-  },
-  "key": ""
+  }
 }

@@ -1,0 +1,103 @@
+EmptyDomai - AI Domain Generator & Bulk Checker
+
+The ultimate domain hunting toolkit. Generate AI-powered domain names, bulk check availability, verify brand presence across the web - all in one extension. No API key required to start checking domains!
+
+✨ KEY FEATURES
+
+🔍 Bulk Domain Checker (No API Key Required!)
+• Paste a comma-separated list of domains and instantly check availability
+• Support for 50+ popular TLDs (.com, .io, .ai, .dev, .net, .org and more)
+• Smart TLD detection - paste "example.com" and it won't add another TLD on top
+• Compare prices across top registrars (Namecheap, GoDaddy, Porkbun, Google Domains)
+• One-click purchase links to your preferred registrar
+
+🔮 AI Domain Generation
+• Generate dozens of unique, creative domain names instantly
+• Support for multiple AI providers (OpenAI, Anthropic Claude, Google Gemini, Groq)
+• Smart suggestions based on your keywords, industry, and style preferences
+• Multiple naming styles: brandable, descriptive, techy, playful, luxury, minimal, professional
+• Choose your language - generate names in English, Turkish, Spanish, and more
+
+✅ Real-Time Availability Check
+• Instantly verify if domains are available or taken
+• WHOIS lookup with expiry date tracking
+• Domain valuation estimates and investment scores
+• Catch expiring domains before anyone else
+
+🔎 Google Search & Web Presence Check
+• See how competitive a domain name is on Google
+• Check existing web presence for any domain
+• Make informed decisions before purchasing
+
+📱 App Store & Social Media Verification
+• Check if your brand name is available on Google Play Store
+• Verify availability on Apple App Store
+• Check social media handles across Instagram, Twitter/X, TikTok, YouTube, GitHub, Discord, Facebook, LinkedIn
+• Avoid naming conflicts before you commit to a brand
+
+🎨 AI Logo Generation
+• Generate professional logo concepts for your brand instantly
+• Multiple style options: minimal, modern, vintage, playful, luxury, tech
+• Powered by leading AI image models (DALL-E, Stable Diffusion, Flux, and more)
+
+📂 My Domains - Portfolio Manager
+• Track all your purchased domains in one place
+• Monitor expiration dates with visual alerts
+• Store registrar info, DNS settings, and hosting details
+• Export your domain portfolio to CSV
+• Never miss a renewal deadline again
+
+⭐ Favorites & Watchlist
+• Save promising domain ideas for later
+• Track WHOIS expiry dates - get notified when domains are about to drop
+• Compare pricing across registrars for your saved domains
+• Quick access to availability and purchase links
+
+🏷️ Domain Pricing Comparison
+• Real-time pricing from multiple registrars
+• Find the cheapest place to register your domain
+• Local registrar support for better regional pricing
+• Save money on every domain purchase
+
+🔒 PRIVACY & SECURITY
+• Your API keys are stored locally - never sent to our servers
+• Use your own AI provider accounts
+• No data collection or tracking
+• Open and transparent operation
+
+🛠️ HOW IT WORKS
+
+Without API Key (Free, instant):
+1. Switch to "Bulk Check" mode
+2. Paste your domain list (comma or line separated)
+3. Select TLDs and hit "Check Availability"
+4. See results with pricing and registrar links
+
+With AI (bring your own API key):
+1. Enter keywords describing your business or project
+2. Select your AI provider and naming style
+3. Get instant AI-generated domain suggestions with availability status
+4. Save favorites, generate logos, and verify brand availability
+5. Purchase directly from your preferred registrar
+
+💡 PERFECT FOR
+• Domain investors hunting for valuable domains
+• Entrepreneurs launching new startups
+• Developers building side projects
+• Marketers brainstorming brand names
+• Agencies finding domains for clients
+• Anyone looking for the perfect web address
+
+🆓 FREE PLAN INCLUDES
+• 30 bulk domain checks per day
+• 3 favorite domains
+• 3 portfolio domains
+• Full access to all features
+
+💎 LIFETIME PLAN - $29 (One-time payment)
+• Unlimited bulk domain checks
+• Unlimited favorites
+• Unlimited portfolio domains
+• Lifetime access - no subscription needed
+
+Start finding your perfect domain today - no API key needed for bulk checking!

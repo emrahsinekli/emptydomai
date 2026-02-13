@@ -1,0 +1,12 @@
+{
+  "functions": {
+    "source": "firebase/functions",
+    "predeploy": [
+      "npm --prefix firebase/functions run build"
+    ]
+  },
+  "firestore": {
+    "rules": "firebase/firestore.rules",
+    "indexes": "firebase/firestore.indexes.json"
+  }
+}

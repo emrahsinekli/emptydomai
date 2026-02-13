@@ -7,7 +7,7 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   User as FirebaseUser
-} from 'firebase/auth';
+} from 'firebase/auth/web-extension';
 import {
   getFirestore,
   Firestore,
@@ -18,13 +18,11 @@ import {
   collection,
   query,
   where,
-  orderBy,
   limit,
   getDocs,
   addDoc,
   deleteDoc,
   Timestamp,
-  QueryConstraint
 } from 'firebase/firestore';
 import type {
   User,
@@ -33,17 +31,16 @@ import type {
   SearchParams,
   DomainResult,
   Favorite,
-  DEFAULT_USER_SETTINGS
 } from '../types';
 
-// Firebase configuration - Replace with your actual config
+// Firebase configuration
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT_ID.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT_ID.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
+  apiKey: "AIzaSyCoD3qhWiOnftZNCLKC3ZGIAk_6NOAcoKs",
+  authDomain: "emptydomai-6d098.firebaseapp.com",
+  projectId: "emptydomai-6d098",
+  storageBucket: "emptydomai-6d098.firebasestorage.app",
+  messagingSenderId: "989858667510",
+  appId: "1:989858667510:web:1a187400e5fdee4b7d45d7"
 };
 
 let app: FirebaseApp;
@@ -71,9 +68,11 @@ export const getFirebaseDb = (): Firestore => {
 };
 
 // Auth functions
-export const signInWithGoogle = async (token: string): Promise<FirebaseUser> => {
+export const signInWithGoogle = async (accessToken: string): Promise<FirebaseUser> => {
   const auth = getFirebaseAuth();
-  const credential = GoogleAuthProvider.credential(token);
+  // Chrome identity API returns access_token, not id_token
+  // Pass null as id_token and access_token as second parameter
+  const credential = GoogleAuthProvider.credential(null, accessToken);
   const result = await signInWithCredential(auth, credential);
   return result.user;
 };
@@ -171,20 +170,25 @@ export const getSearchHistory = async (
   const db = getFirebaseDb();
   const searchesRef = collection(db, 'searches');
 
-  const constraints: QueryConstraint[] = [
+  // Simple query without orderBy to avoid composite index requirement
+  const q = query(
+    searchesRef,
     where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
-    limit(limitCount),
-  ];
+    limit(limitCount * 2) // Fetch more since we'll sort client-side
+  );
 
-  const q = query(searchesRef, ...constraints);
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map(doc => ({
+  const records = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate() || new Date(),
   })) as SearchRecord[];
+
+  // Sort client-side and limit
+  return records
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limitCount);
 };
 
 export const getSearchById = async (searchId: string): Promise<SearchRecord | null> => {
@@ -268,20 +272,23 @@ export const getFavorites = async (
   const db = getFirebaseDb();
   const favoritesRef = collection(db, 'favorites');
 
+  // Simple query without orderBy to avoid composite index requirement
   const q = query(
     favoritesRef,
     where('userId', '==', userId),
-    orderBy('createdAt', 'desc'),
     limit(limitCount)
   );
 
   const snapshot = await getDocs(q);
 
-  return snapshot.docs.map(doc => ({
+  const favorites = snapshot.docs.map(doc => ({
     id: doc.id,
     ...doc.data(),
     createdAt: doc.data().createdAt?.toDate() || new Date(),
   })) as Favorite[];
+
+  // Sort client-side instead
+  return favorites.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 };
 
 export const isFavorite = async (userId: string, fullDomain: string): Promise<boolean> => {
@@ -296,6 +303,30 @@ export const isFavorite = async (userId: string, fullDomain: string): Promise<bo
 
   const snapshot = await getDocs(q);
   return !snapshot.empty;
+};
+
+// ============================================
+// PLAN MANAGEMENT (Firestore <-> Local sync)
+// ============================================
+
+/**
+ * Fetch user's plan from Firestore
+ * Called after login and periodically to sync
+ */
+export const getUserPlanFromFirestore = async (uid: string): Promise<'free' | 'lifetime'> => {
+  try {
+    const db = getFirebaseDb();
+    const userRef = doc(db, 'users', uid);
+    const userDoc = await getDoc(userRef);
+
+    if (!userDoc.exists()) return 'free';
+
+    const data = userDoc.data();
+    return data?.plan === 'lifetime' ? 'lifetime' : 'free';
+  } catch (error) {
+    console.error('Failed to fetch plan from Firestore:', error);
+    return 'free';
+  }
 };
 
 // Initialize on import

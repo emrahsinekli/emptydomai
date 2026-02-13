@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { Favorite } from '../types';
+import { canAddFavorite } from '../services/storage';
+
+const FAVORITES_STORAGE_KEY = 'emptydomai_favorites';
 
 interface FavoritesState {
   favorites: Favorite[];
@@ -50,12 +53,41 @@ export function useFavorites() {
     }
   }, []);
 
+  // Load favorites on mount
   useEffect(() => {
     loadFavorites();
   }, [loadFavorites]);
 
-  const addFavorite = useCallback(async (domain: string, tld: string, searchId?: string) => {
+  // Listen for storage changes to sync favorites in real-time
+  useEffect(() => {
+    const handleStorageChange = (
+      changes: { [key: string]: chrome.storage.StorageChange },
+      areaName: string
+    ) => {
+      if (areaName === 'local' && changes[FAVORITES_STORAGE_KEY]) {
+        const newFavorites = (changes[FAVORITES_STORAGE_KEY].newValue || []) as Favorite[];
+        const favoriteIds = new Set<string>(newFavorites.map((f) => f.fullDomain));
+        setState({
+          favorites: newFavorites,
+          isLoading: false,
+          error: null,
+          favoriteIds,
+        });
+      }
+    };
+
+    chrome.storage.onChanged.addListener(handleStorageChange);
+    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+  }, []);
+
+  const addFavorite = useCallback(async (domain: string, tld: string, searchId?: string): Promise<boolean | 'limit_reached'> => {
     const fullDomain = `${domain}${tld}`;
+
+    // Check limits before adding
+    const limitCheck = await canAddFavorite();
+    if (!limitCheck.allowed) {
+      return 'limit_reached';
+    }
 
     // Optimistic update
     setState((prev) => ({
@@ -129,7 +161,7 @@ export function useFavorites() {
     return state.favoriteIds.has(fullDomain);
   }, [state.favoriteIds]);
 
-  const toggleFavorite = useCallback(async (domain: string, tld: string, searchId?: string) => {
+  const toggleFavorite = useCallback(async (domain: string, tld: string, searchId?: string): Promise<boolean | 'limit_reached'> => {
     const fullDomain = `${domain}${tld}`;
 
     if (isFavorite(fullDomain)) {

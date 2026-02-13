@@ -1,47 +1,54 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
-import { WelcomeScreen } from '../components/WelcomeScreen';
 import { GenerateTab } from '../components/GenerateTab';
-import { HistoryTab } from '../components/HistoryTab';
 import { FavoritesTab } from '../components/FavoritesTab';
+import { MyDomainsTab } from '../components/MyDomainsTab';
 import { SettingsTab } from '../components/SettingsTab';
-import { hasAPIKey } from '../services/storage';
+import { createCheckoutSession } from '../services/lemonsqueezy';
 
-type Tab = 'generate' | 'history' | 'favorites' | 'settings';
+type Tab = 'generate' | 'favorites' | 'mydomains' | 'settings';
 
 export const App: React.FC = () => {
-  const { user, isLoading, error, isAuthenticated, login, logout } = useAuth();
+  const { user, isLoading: authLoading, login, logout, startPlanPolling } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('generate');
-  const [showApiKeyWarning, setShowApiKeyWarning] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradeReason, setUpgradeReason] = useState<string>('');
+  const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
 
-  // Check if API key is configured
-  useEffect(() => {
-    const checkApiKey = async () => {
-      const hasKey = await hasAPIKey('openai');
-      setShowApiKeyWarning(!hasKey);
-    };
+  // Global upgrade handler - can be called from any component
+  const handleShowUpgrade = useCallback((reason?: string) => {
+    setUpgradeReason(reason || '');
+    setShowUpgradeModal(true);
+  }, []);
 
-    if (isAuthenticated) {
-      checkApiKey();
+  const handleCheckout = async () => {
+    setIsProcessingCheckout(true);
+    try {
+      const { success, checkoutUrl, error } = await createCheckoutSession({
+        email: user?.email,
+        name: user?.displayName || undefined,
+        customData: {
+          firebaseUid: user?.uid || '',
+          userId: user?.email || 'anonymous',
+          source: 'chrome-extension',
+        },
+      });
+
+      if (success && checkoutUrl) {
+        window.open(checkoutUrl, '_blank');
+        setShowUpgradeModal(false);
+        // Start polling for plan update after checkout
+        startPlanPolling();
+      } else {
+        alert(`Failed to create checkout: ${error}`);
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+      alert('Failed to open checkout. Please try again.');
+    } finally {
+      setIsProcessingCheckout(false);
     }
-  }, [isAuthenticated]);
-
-  // Show loading screen while checking auth
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="w-10 h-10 mx-auto mb-3 spinner" />
-          <p className="text-sm text-gray-500">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show welcome/login screen if not authenticated
-  if (!isAuthenticated) {
-    return <WelcomeScreen onLogin={login} isLoading={isLoading} error={error} />;
-  }
+  };
 
   const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     {
@@ -65,26 +72,6 @@ export const App: React.FC = () => {
       ),
     },
     {
-      id: 'history',
-      label: 'History',
-      icon: (
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-          strokeWidth={2}
-          stroke="currentColor"
-          className="w-4 h-4"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      ),
-    },
-    {
       id: 'favorites',
       label: 'Favorites',
       icon: (
@@ -100,6 +87,26 @@ export const App: React.FC = () => {
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+          />
+        </svg>
+      ),
+    },
+    {
+      id: 'mydomains',
+      label: 'My Domains',
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={2}
+          stroke="currentColor"
+          className="w-4 h-4"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"
           />
         </svg>
       ),
@@ -132,77 +139,190 @@ export const App: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen flex flex-col bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth={2}
-                stroke="currentColor"
-                className="w-4 h-4 text-white"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"
-                />
-              </svg>
-            </div>
-            <h1 className="font-semibold text-gray-900">EmptyDomai</h1>
-          </div>
-
-          {user && (
-            <div className="flex items-center gap-2">
-              {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt={user.displayName || 'User'}
-                  className="w-6 h-6 rounded-full"
-                />
-              ) : (
-                <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
-                  <span className="text-xs text-primary-600 font-medium">
-                    {(user.displayName || user.email)?.[0]?.toUpperCase()}
-                  </span>
+    <div className="h-screen flex flex-col bg-gray-50 overflow-hidden">
+      {/* Global Upgrade Modal */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary-500 to-primary-600 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6 text-white">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">Upgrade to Lifetime</h2>
+                    <p className="text-sm text-gray-500">One-time payment, unlimited forever</p>
+                  </div>
                 </div>
-              )}
+                <button
+                  onClick={() => setShowUpgradeModal(false)}
+                  className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-gray-400">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      </header>
 
-      {/* API Key Warning */}
-      {showApiKeyWarning && activeTab !== 'settings' && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-4 py-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-yellow-700">
-              Add your OpenAI API key to start generating domains
-            </span>
-            <button
-              onClick={() => setActiveTab('settings')}
-              className="text-yellow-700 font-medium hover:underline"
-            >
-              Settings
-            </button>
+            {/* Reason Banner */}
+            {upgradeReason && (
+              <div className="mx-6 mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-sm text-amber-800 font-medium">{upgradeReason}</p>
+              </div>
+            )}
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6">
+              {/* Unlimited Features */}
+              <div>
+                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-600">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Unlimited Access
+                </h3>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-gray-900">Unlimited Bulk Checks</p>
+                      <p className="text-sm text-gray-600">Check as many domains as you want, every day</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-gray-900">Unlimited Favorites</p>
+                      <p className="text-sm text-gray-600">Save as many favorite domains as you want</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-3 p-3 bg-green-50 rounded-lg border border-green-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+                    </svg>
+                    <div>
+                      <p className="font-medium text-gray-900">Unlimited My Domains</p>
+                      <p className="text-sm text-gray-600">Track and manage unlimited domains in your portfolio</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Free vs Lifetime Comparison */}
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="font-semibold text-gray-900 mb-3">Free vs Lifetime</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <p className="font-medium text-gray-700 mb-2">Free Plan</p>
+                    <ul className="space-y-1 text-gray-600">
+                      <li>30 bulk checks/day</li>
+                      <li>3 favorites max</li>
+                      <li>3 domains max</li>
+                    </ul>
+                  </div>
+                  <div className="p-3 bg-gradient-to-br from-primary-50 to-primary-100 rounded-lg border border-primary-200">
+                    <p className="font-medium text-primary-900 mb-2">Lifetime</p>
+                    <ul className="space-y-1 text-primary-700">
+                      <li>Unlimited checks</li>
+                      <li>Unlimited favorites</li>
+                      <li>Unlimited domains</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {/* CTA Button */}
+              <button
+                onClick={handleCheckout}
+                disabled={isProcessingCheckout}
+                className="w-full py-3 px-4 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg font-semibold text-base hover:from-primary-700 hover:to-primary-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isProcessingCheckout ? 'Opening checkout...' : 'Get Lifetime Access — $29'}
+              </button>
+              <p className="text-xs text-center text-gray-500">
+                One-time payment. Lifetime access. No subscription.
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Tab Content */}
-      <main className="flex-1 overflow-hidden">
-        {activeTab === 'generate' && <GenerateTab />}
-        {activeTab === 'history' && <HistoryTab />}
-        {activeTab === 'favorites' && <FavoritesTab />}
-        {activeTab === 'settings' && <SettingsTab onLogout={logout} user={user} />}
+      {/* Header - FIXED */}
+      <header className="flex-none bg-white border-b border-gray-200 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <img
+              src={chrome.runtime.getURL('icons/icon48.png')}
+              alt="EmptyDomai"
+              className="w-7 h-7 rounded-lg"
+            />
+            <h1 className="font-semibold text-gray-900">EmptyDomai</h1>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {/* Upgrade badge for free users */}
+            {user && user.plan !== 'lifetime' && (
+              <button
+                onClick={() => handleShowUpgrade()}
+                className="px-2 py-1 text-[10px] font-bold bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-full hover:from-primary-600 hover:to-primary-700 transition-all shadow-sm"
+              >
+                UPGRADE
+              </button>
+            )}
+            {user && (
+              <>
+                {user.plan === 'lifetime' && (
+                  <span className="px-2 py-0.5 text-[10px] font-bold bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full">
+                    LIFETIME
+                  </span>
+                )}
+                {user.photoURL ? (
+                  <img
+                    src={user.photoURL}
+                    alt={user.displayName || 'User'}
+                    className="w-6 h-6 rounded-full"
+                  />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
+                    <span className="text-xs text-primary-600 font-medium">
+                      {(user.displayName || user.email)?.[0]?.toUpperCase()}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Tab Content - SCROLLABLE AREA */}
+      {/* Using CSS to hide/show tabs instead of unmounting to preserve state */}
+      <main className="flex-1 min-h-0 overflow-hidden relative">
+        <div className={`absolute inset-0 ${activeTab === 'generate' ? '' : 'hidden'}`}>
+          <GenerateTab onUpgrade={handleShowUpgrade} />
+        </div>
+        <div className={`absolute inset-0 ${activeTab === 'favorites' ? '' : 'hidden'}`}>
+          <FavoritesTab onUpgrade={handleShowUpgrade} />
+        </div>
+        <div className={`absolute inset-0 ${activeTab === 'mydomains' ? '' : 'hidden'}`}>
+          <MyDomainsTab onUpgrade={handleShowUpgrade} />
+        </div>
+        <div className={`absolute inset-0 ${activeTab === 'settings' ? '' : 'hidden'}`}>
+          <SettingsTab onLogout={logout} onLogin={login} user={user} isAuthLoading={authLoading} onUpgrade={handleShowUpgrade} />
+        </div>
       </main>
 
-      {/* Tab Bar */}
-      <nav className="bg-white border-t border-gray-200">
+      {/* Tab Bar - FIXED */}
+      <nav className="flex-none bg-white border-t border-gray-200">
         <div className="flex">
           {tabs.map((tab) => (
             <button

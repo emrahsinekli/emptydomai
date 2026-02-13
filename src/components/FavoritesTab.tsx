@@ -1,9 +1,47 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useFavorites } from '../hooks/useFavorites';
 import { getRegistrarLinks } from '../types';
+import { fetchWhoisInfo, type WhoisInfo, getDomainDropStatus } from '../services/whois';
+import { getCachedDomainPricing, formatPrice, type PricingResult } from '../services/pricing';
 
-export const FavoritesTab: React.FC = () => {
+interface FavoriteWithWhois {
+  id: string;
+  fullDomain: string;
+  domain: string;
+  tld: string;
+  createdAt: Date;
+  whois?: WhoisInfo;
+  isLoadingWhois?: boolean;
+  pricing?: PricingResult;
+  isLoadingPricing?: boolean;
+}
+
+interface FavoritesTabProps {
+  onUpgrade?: (reason?: string) => void;
+}
+
+export const FavoritesTab: React.FC<FavoritesTabProps> = ({ onUpgrade: _onUpgrade }) => {
   const { favorites, isLoading, error, removeFavorite, refresh } = useFavorites();
+  const [favoritesWithWhois, setFavoritesWithWhois] = useState<FavoriteWithWhois[]>([]);
+  const [isCheckingAll, setIsCheckingAll] = useState(false);
+  const hasAutoChecked = useRef(false);
+
+  // Sync favorites with local state (preserve existing whois and pricing data)
+  useEffect(() => {
+    setFavoritesWithWhois(prev => {
+      // Create maps of existing data
+      const existingWhoisMap = new Map(prev.map(f => [f.fullDomain, f.whois]));
+      const existingPricingMap = new Map(prev.map(f => [f.fullDomain, f.pricing]));
+
+      return favorites.map(f => ({
+        ...f,
+        whois: existingWhoisMap.get(f.fullDomain),
+        isLoadingWhois: false,
+        pricing: existingPricingMap.get(f.fullDomain),
+        isLoadingPricing: false,
+      }));
+    });
+  }, [favorites]);
 
   const handleCopy = async (domain: string) => {
     await navigator.clipboard.writeText(domain);
@@ -12,6 +50,95 @@ export const FavoritesTab: React.FC = () => {
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString();
   };
+
+  // Check WHOIS for a single domain
+  const checkWhois = async (fullDomain: string) => {
+    setFavoritesWithWhois(prev => prev.map(f =>
+      f.fullDomain === fullDomain ? { ...f, isLoadingWhois: true } : f
+    ));
+
+    try {
+      const whois = await fetchWhoisInfo(fullDomain);
+      setFavoritesWithWhois(prev => prev.map(f =>
+        f.fullDomain === fullDomain ? { ...f, whois, isLoadingWhois: false } : f
+      ));
+    } catch (error) {
+      console.error('Failed to fetch WHOIS:', error);
+      setFavoritesWithWhois(prev => prev.map(f =>
+        f.fullDomain === fullDomain ? { ...f, isLoadingWhois: false } : f
+      ));
+    }
+  };
+
+  // Fetch pricing for a single domain
+  const fetchPricing = async (domain: string, tld: string, fullDomain: string) => {
+    setFavoritesWithWhois(prev => prev.map(f =>
+      f.fullDomain === fullDomain ? { ...f, isLoadingPricing: true } : f
+    ));
+
+    try {
+      const pricing = await getCachedDomainPricing(domain, tld);
+      setFavoritesWithWhois(prev => prev.map(f =>
+        f.fullDomain === fullDomain ? { ...f, pricing, isLoadingPricing: false } : f
+      ));
+    } catch (error) {
+      console.error('Failed to fetch pricing:', error);
+      setFavoritesWithWhois(prev => prev.map(f =>
+        f.fullDomain === fullDomain ? { ...f, isLoadingPricing: false } : f
+      ));
+    }
+  };
+
+  // Fetch pricing for available domains
+  useEffect(() => {
+    const fetchAllPricing = async () => {
+      for (const favorite of favoritesWithWhois) {
+        const isAvailable = !favorite.whois || favorite.whois?.error === 'Domain not registered';
+        if (isAvailable && !favorite.pricing && !favorite.isLoadingPricing) {
+          await fetchPricing(favorite.domain, favorite.tld, favorite.fullDomain);
+          // Small delay to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200));
+        }
+      }
+    };
+
+    if (favoritesWithWhois.length > 0) {
+      fetchAllPricing();
+    }
+  }, [favoritesWithWhois.length]);
+
+  // Check all favorites (accepts optional list to check)
+  const checkAllExpiry = async (domainsToCheck?: string[]) => {
+    setIsCheckingAll(true);
+    const domains = domainsToCheck || favoritesWithWhois.filter(f => !f.whois).map(f => f.fullDomain);
+
+    for (const fullDomain of domains) {
+      await checkWhois(fullDomain);
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300));
+    }
+    setIsCheckingAll(false);
+  };
+
+  // Auto-check expiry when favorites tab opens (only once per session)
+  useEffect(() => {
+    if (!hasAutoChecked.current && favorites.length > 0 && !isLoading) {
+      hasAutoChecked.current = true;
+      // Check all domains immediately using favorites list
+      const allDomains = favorites.map(f => f.fullDomain);
+      checkAllExpiry(allDomains);
+    }
+  }, [favorites, isLoading]);
+
+  // Get expiring soon domains
+  const expiringSoon = favoritesWithWhois.filter(f =>
+    f.whois?.isExpiringSoon || (f.whois?.daysUntilExpiry !== undefined && f.whois.daysUntilExpiry <= 90)
+  );
+
+  // Get available domains (previously taken but now available)
+  const nowAvailable = favoritesWithWhois.filter(f =>
+    f.whois?.error === 'Domain not registered'
+  );
 
   if (isLoading) {
     return (
@@ -69,23 +196,82 @@ export const FavoritesTab: React.FC = () => {
         <span className="text-sm text-gray-600">
           {favorites.length} favorite{favorites.length !== 1 ? 's' : ''}
         </span>
-        <button
-          onClick={() => refresh()}
-          className="text-sm text-primary-600 hover:text-primary-700"
-        >
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => checkAllExpiry()}
+            disabled={isCheckingAll}
+            className="text-xs px-2 py-1 bg-yellow-100 text-yellow-700 rounded hover:bg-yellow-200 disabled:opacity-50 flex items-center gap-1"
+            title="Check expiry dates for all favorites"
+          >
+            {isCheckingAll ? (
+              <>
+                <span className="w-3 h-3 border-2 border-yellow-500 border-t-transparent rounded-full animate-spin" />
+                Checking...
+              </>
+            ) : (
+              <>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Check Expiry
+              </>
+            )}
+          </button>
+          <button
+            onClick={() => refresh()}
+            className="text-sm text-primary-600 hover:text-primary-700"
+          >
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* Alerts Section */}
+      {(expiringSoon.length > 0 || nowAvailable.length > 0) && (
+        <div className="px-4 py-2 space-y-2 bg-gray-50 border-b border-gray-200">
+          {nowAvailable.length > 0 && (
+            <div className="p-2 bg-green-100 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 text-green-700 text-xs font-medium mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                {nowAvailable.length} domain{nowAvailable.length > 1 ? 's' : ''} now available!
+              </div>
+              <div className="text-[10px] text-green-600">
+                {nowAvailable.map(f => f.fullDomain).join(', ')}
+              </div>
+            </div>
+          )}
+          {expiringSoon.length > 0 && (
+            <div className="p-2 bg-yellow-100 border border-yellow-200 rounded-lg">
+              <div className="flex items-center gap-2 text-yellow-700 text-xs font-medium mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                {expiringSoon.length} domain{expiringSoon.length > 1 ? 's' : ''} expiring soon
+              </div>
+              <div className="text-[10px] text-yellow-600">
+                {expiringSoon.map(f => `${f.fullDomain} (${f.whois?.daysUntilExpiry}d)`).join(', ')}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Favorites List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-2">
-        {favorites.map((favorite) => {
+        {favoritesWithWhois.map((favorite) => {
           const registrarLinks = getRegistrarLinks(favorite.fullDomain);
+          const dropStatus = favorite.whois ? getDomainDropStatus(favorite.whois) : null;
 
           return (
             <div
               key={favorite.id}
-              className="card hover:border-primary-300 transition-colors"
+              className={`card hover:border-primary-300 transition-colors ${
+                dropStatus?.status === 'available' ? 'border-green-300 bg-green-50' :
+                dropStatus?.status === 'expiring' ? 'border-yellow-300 bg-yellow-50' :
+                dropStatus?.status === 'dropping' ? 'border-red-300 bg-red-50' : ''
+              }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2 min-w-0">
@@ -111,11 +297,41 @@ export const FavoritesTab: React.FC = () => {
                       {favorite.domain}
                     </span>
                     <span className="text-primary-600">{favorite.tld}</span>
+                    {dropStatus && (
+                      <span className={`ml-2 px-1.5 py-0.5 rounded text-[10px] ${
+                        dropStatus.status === 'available' ? 'bg-green-200 text-green-700' :
+                        dropStatus.status === 'expiring' ? 'bg-yellow-200 text-yellow-700' :
+                        dropStatus.status === 'dropping' ? 'bg-red-200 text-red-700' :
+                        'bg-gray-200 text-gray-700'
+                      }`}>
+                        {dropStatus.status === 'available' ? 'AVAILABLE!' :
+                         dropStatus.status === 'expiring' ? `${favorite.whois?.daysUntilExpiry}d left` :
+                         dropStatus.status === 'dropping' ? 'DROPPING' : 'Active'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
                 {/* Actions */}
                 <div className="flex items-center gap-1 flex-shrink-0">
+                  {/* Check WHOIS */}
+                  {!favorite.whois && (
+                    <button
+                      onClick={() => checkWhois(favorite.fullDomain)}
+                      disabled={favorite.isLoadingWhois}
+                      className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-blue-500 transition-colors"
+                      title="Check WHOIS"
+                    >
+                      {favorite.isLoadingWhois ? (
+                        <span className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin block" />
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
+
                   {/* Copy */}
                   <button
                     onClick={() => handleCopy(favorite.fullDomain)}
@@ -162,20 +378,123 @@ export const FavoritesTab: React.FC = () => {
                 </div>
               </div>
 
-              {/* Registrar links */}
-              <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap gap-1">
-                {registrarLinks.slice(0, 4).map((link) => (
-                  <a
-                    key={link.name}
-                    href={link.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-primary-100 hover:text-primary-700 transition-colors"
-                  >
-                    {link.name}
-                  </a>
-                ))}
-              </div>
+              {/* WHOIS Info */}
+              {favorite.whois && !favorite.whois.error && (
+                <div className="mt-2 pt-2 border-t border-gray-100 text-[10px] text-gray-500 grid grid-cols-2 gap-1">
+                  {favorite.whois.expiryDate && (
+                    <div>
+                      <span className="text-gray-400">Expires:</span>{' '}
+                      <span className={favorite.whois.isExpiringSoon ? 'text-red-600 font-medium' : ''}>
+                        {favorite.whois.expiryDate}
+                      </span>
+                    </div>
+                  )}
+                  {favorite.whois.registrar && (
+                    <div className="truncate">
+                      <span className="text-gray-400">Registrar:</span>{' '}
+                      {favorite.whois.registrar}
+                    </div>
+                  )}
+                  {favorite.whois.age !== undefined && (
+                    <div>
+                      <span className="text-gray-400">Age:</span>{' '}
+                      {favorite.whois.age} years
+                    </div>
+                  )}
+                  {favorite.whois.daysUntilExpiry !== undefined && (
+                    <div>
+                      <span className="text-gray-400">Days left:</span>{' '}
+                      <span className={favorite.whois.daysUntilExpiry <= 30 ? 'text-red-600 font-medium' : ''}>
+                        {favorite.whois.daysUntilExpiry}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Available Notice */}
+              {favorite.whois?.error === 'Domain not registered' && (
+                <div className="mt-2 p-2 bg-green-100 rounded-lg text-xs text-green-700 flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  This domain is now available for registration!
+                </div>
+              )}
+
+              {/* Dynamic Pricing & Registrar Links - ONLY show for available domains or unknown status */}
+              {(dropStatus?.status === 'available' || !favorite.whois || favorite.whois?.error === 'Domain not registered') && (
+                <div className="mt-2 pt-2 border-t border-gray-100">
+                  {favorite.isLoadingPricing ? (
+                    <div className="flex items-center gap-2 text-xs text-gray-500">
+                      <span className="w-3 h-3 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+                      Loading prices...
+                    </div>
+                  ) : favorite.pricing && favorite.pricing.registrars.length > 0 ? (
+                    <div className="space-y-1.5">
+                      {/* Cheapest price */}
+                      {favorite.pricing.cheapest && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-green-600 font-medium">Best:</span>
+                          <a
+                            href={favorite.pricing.cheapest.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm font-bold text-green-700 hover:text-green-800"
+                          >
+                            {formatPrice(favorite.pricing.cheapest.price)}
+                          </a>
+                          <span className="text-[10px] text-gray-500">
+                            @ {favorite.pricing.cheapest.registrar}
+                            {favorite.pricing.cheapest.isLocal && (
+                              <span className="ml-1 px-1 py-0.5 bg-blue-100 text-blue-600 rounded text-[8px]">LOCAL</span>
+                            )}
+                          </span>
+                        </div>
+                      )}
+                      {/* Top 4 registrars */}
+                      <div className="flex flex-wrap gap-1">
+                        {favorite.pricing.registrars.slice(0, 4).map((reg, index) => (
+                          <a
+                            key={reg.registrar}
+                            href={reg.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`text-[10px] px-1.5 py-0.5 rounded transition-colors flex items-center gap-1 ${
+                              index === 0
+                                ? 'bg-green-500 text-white hover:bg-green-600'
+                                : reg.isLocal
+                                ? 'bg-blue-100 text-blue-700 hover:bg-blue-200'
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                            title={reg.registrar}
+                          >
+                            {formatPrice(reg.price)}
+                            {reg.isLocal && index !== 0 && (
+                              <span className="w-1 h-1 bg-blue-500 rounded-full"></span>
+                            )}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    // Fallback to static links
+                    <div className="flex flex-wrap gap-1">
+                      {registrarLinks.slice(0, 4).map((link) => (
+                        <a
+                          key={link.name}
+                          href={link.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600 hover:bg-primary-100 hover:text-primary-700 transition-colors"
+                        >
+                          {link.name}
+                        </a>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Date */}
               <p className="text-xs text-gray-400 mt-2">
