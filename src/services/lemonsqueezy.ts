@@ -15,7 +15,7 @@ export interface CheckoutResponse {
 // LemonSqueezy Store Configuration
 // TODO: Replace with your actual LemonSqueezy credentials
 const LEMONSQUEEZY_CONFIG = {
-  checkoutId: 'e9e22e59-0825-4cb9-9e9a-cd18e92a2305',
+  checkoutId: 'a309c1d4-5316-4e89-a28f-6477e5403c1f',
 };
 
 /**

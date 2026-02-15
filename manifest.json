@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "EmptyDomai - AI Domain Generator & Bulk Checker",
-  "version": "1.2.0",
-  "description": "Generate AI-powered domain names, bulk check availability, verify brand presence across the web - all in one extension. No API key required to start checking domains!",
+  "version": "1.3.0",
+  "description": "AI domain generator & bulk checker. Check availability, compare prices, track expiry - no API key needed!",
   "permissions": [
     "storage",
     "contextMenus",

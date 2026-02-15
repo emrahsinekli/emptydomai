@@ -1,6 +1,6 @@
 {
   "name": "emptydomai",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "AI Domain Generator & Bulk Checker Chrome Extension - Generate names, check availability, verify brand presence",
   "type": "module",
   "scripts": {

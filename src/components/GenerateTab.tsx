@@ -30,7 +30,7 @@ interface GenerateTabProps {
 }
 
 export const GenerateTab: React.FC<GenerateTabProps> = ({ onUpgrade }) => {
-  const [inputMode, setInputMode] = useState<InputMode>('ai');
+  const [inputMode, setInputMode] = useState<InputMode>('bulk');
   const [bulkInput, setBulkInput] = useState('');
   const [remainingBulkChecks, setRemainingBulkChecks] = useState<number>(30);
   const [isPro, setIsPro] = useState(false);
@@ -97,6 +97,9 @@ export const GenerateTab: React.FC<GenerateTabProps> = ({ onUpgrade }) => {
       setRemainingBulkChecks(remaining);
       const pro = await isProUser();
       setIsPro(pro);
+      if (pro && results.length === 0) {
+        setInputMode('ai');
+      }
     };
     loadLimits();
   }, [results]); // Refresh after results change
@@ -547,14 +550,20 @@ export const GenerateTab: React.FC<GenerateTabProps> = ({ onUpgrade }) => {
               {/* Input Mode Toggle */}
               <div className="flex bg-gray-100 rounded-lg p-0.5">
                 <button
-                  onClick={() => setInputMode('ai')}
+                  onClick={() => {
+                    if (!isPro) {
+                      onUpgrade?.('AI domain generation is a Lifetime feature. Upgrade to generate creative domain names with AI.');
+                      return;
+                    }
+                    setInputMode('ai');
+                  }}
                   className={`flex-1 py-1.5 text-xs font-medium rounded-md transition-colors ${
                     inputMode === 'ai'
                       ? 'bg-white text-primary-700 shadow-sm'
                       : 'text-gray-500 hover:text-gray-700'
                   }`}
                 >
-                  AI Generate
+                  AI Generate {!isPro && <span className="text-[9px] ml-0.5 opacity-60">PRO</span>}
                 </button>
                 <button
                   onClick={() => setInputMode('bulk')}

@@ -175,6 +175,11 @@ export const addLocalFavorite = async (domain: string, tld: string): Promise<str
   favorites.unshift(newFavorite); // Add to beginning
   await setToStorage(STORAGE_KEYS.FAVORITES, favorites);
 
+  // Track in sync storage for reinstall protection
+  const syncUsage = await getSyncUsage();
+  syncUsage.totalFavoritesAdded = favorites.length;
+  await saveSyncUsage(syncUsage);
+
   return newFavorite.id;
 };
 
@@ -183,6 +188,11 @@ export const removeLocalFavorite = async (fullDomain: string): Promise<void> => 
   const favorites = await getLocalFavorites();
   const filtered = favorites.filter(f => f.fullDomain !== fullDomain);
   await setToStorage(STORAGE_KEYS.FAVORITES, filtered);
+
+  // Update sync counter to match actual count
+  const syncUsage = await getSyncUsage();
+  syncUsage.totalFavoritesAdded = filtered.length;
+  await saveSyncUsage(syncUsage);
 };
 
 // Check if a domain is favorited locally
@@ -255,6 +265,11 @@ export const addMyDomain = async (domain: Omit<MyDomain, 'id' | 'createdAt' | 'u
   domains.unshift(newDomain); // Add to beginning
   await setToStorage(STORAGE_KEYS.MY_DOMAINS, domains);
 
+  // Track in sync storage for reinstall protection
+  const syncUsage = await getSyncUsage();
+  syncUsage.totalDomainsAdded = domains.length;
+  await saveSyncUsage(syncUsage);
+
   return newDomain;
 };
 
@@ -285,6 +300,12 @@ export const deleteMyDomain = async (id: string): Promise<boolean> => {
   if (filtered.length === domains.length) return false; // Nothing deleted
 
   await setToStorage(STORAGE_KEYS.MY_DOMAINS, filtered);
+
+  // Update sync counter to match actual count
+  const syncUsage = await getSyncUsage();
+  syncUsage.totalDomainsAdded = filtered.length;
+  await saveSyncUsage(syncUsage);
+
   return true;
 };
 
@@ -375,23 +396,79 @@ export const getUsageLimits = async () => {
 };
 
 // ============================================
-// DAILY USAGE TRACKING
+// DAILY USAGE TRACKING (uses chrome.storage.sync to persist across reinstalls)
 // ============================================
+
+const SYNC_USAGE_KEY = 'emptydomai_sync_usage';
+
+interface SyncUsage {
+  dailyBulkChecks: number;
+  dailyDate: string;
+  totalFavoritesAdded: number;
+  totalDomainsAdded: number;
+}
+
+// Get/set from sync storage (persists across reinstalls via Google account)
+const getFromSync = async <T>(key: string): Promise<T | null> => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get([key], (result) => {
+      resolve(result[key] || null);
+    });
+  });
+};
+
+const setToSync = async <T>(key: string, value: T): Promise<void> => {
+  return new Promise((resolve) => {
+    chrome.storage.sync.set({ [key]: value }, () => {
+      resolve();
+    });
+  });
+};
+
+const getSyncUsage = async (): Promise<SyncUsage> => {
+  const usage = await getFromSync<SyncUsage>(SYNC_USAGE_KEY);
+  const today = getTodayString();
+
+  if (!usage) {
+    return { dailyBulkChecks: 0, dailyDate: today, totalFavoritesAdded: 0, totalDomainsAdded: 0 };
+  }
+
+  // Reset daily counter if new day
+  if (usage.dailyDate !== today) {
+    return { ...usage, dailyBulkChecks: 0, dailyDate: today };
+  }
+
+  return usage;
+};
+
+const saveSyncUsage = async (usage: SyncUsage): Promise<void> => {
+  await setToSync(SYNC_USAGE_KEY, usage);
+};
 
 const getTodayString = (): string => {
   return new Date().toISOString().split('T')[0]; // YYYY-MM-DD
 };
 
-// Get daily usage (resets each day)
+// Get daily usage (resets each day) - reads from both local and sync, uses higher value
 export const getDailyUsage = async (): Promise<DailyUsage> => {
-  const usage = await getFromStorage<DailyUsage>(STORAGE_KEYS.DAILY_USAGE);
   const today = getTodayString();
 
-  // Reset if it's a new day
-  if (!usage || usage.date !== today) {
-    const freshUsage: DailyUsage = { bulkChecks: 0, date: today };
-    await setToStorage(STORAGE_KEYS.DAILY_USAGE, freshUsage);
-    return freshUsage;
+  // Read from local
+  const localUsage = await getFromStorage<DailyUsage>(STORAGE_KEYS.DAILY_USAGE);
+  const localChecks = (localUsage && localUsage.date === today) ? localUsage.bulkChecks : 0;
+
+  // Read from sync (persistent)
+  const syncUsage = await getSyncUsage();
+  const syncChecks = syncUsage.dailyBulkChecks;
+
+  // Use the higher value (prevents gaming by clearing local storage)
+  const bulkChecks = Math.max(localChecks, syncChecks);
+  const usage: DailyUsage = { bulkChecks, date: today };
+
+  // Keep both in sync
+  await setToStorage(STORAGE_KEYS.DAILY_USAGE, usage);
+  if (syncChecks < bulkChecks) {
+    await saveSyncUsage({ ...syncUsage, dailyBulkChecks: bulkChecks, dailyDate: today });
   }
 
   return usage;
@@ -402,6 +479,11 @@ export const incrementBulkChecks = async (count: number): Promise<void> => {
   const usage = await getDailyUsage();
   usage.bulkChecks += count;
   await setToStorage(STORAGE_KEYS.DAILY_USAGE, usage);
+
+  // Also update sync storage
+  const syncUsage = await getSyncUsage();
+  syncUsage.dailyBulkChecks = usage.bulkChecks;
+  await saveSyncUsage(syncUsage);
 };
 
 // Get remaining bulk checks for today
@@ -423,30 +505,62 @@ export const canDoBulkCheck = async (count: number): Promise<{ allowed: boolean;
   return { allowed: count <= remaining, remaining };
 };
 
-// Check if user can add more favorites
+// Check if user can add more favorites (checks both local count and sync counter)
 export const canAddFavorite = async (): Promise<{ allowed: boolean; current: number; max: number }> => {
   const isPro = await isProUser();
   if (isPro) return { allowed: true, current: 0, max: Infinity };
 
   const favorites = await getLocalFavorites();
+  const syncUsage = await getSyncUsage();
+
+  // Use higher of local count or sync counter (prevents reinstall exploit)
+  const current = Math.max(favorites.length, syncUsage.totalFavoritesAdded);
   return {
-    allowed: favorites.length < FREE_LIMITS.maxFavorites,
-    current: favorites.length,
+    allowed: current < FREE_LIMITS.maxFavorites,
+    current,
     max: FREE_LIMITS.maxFavorites,
   };
 };
 
-// Check if user can add more my domains
+// Track favorite added in sync storage
+export const trackFavoriteAdded = async (): Promise<void> => {
+  const syncUsage = await getSyncUsage();
+  const favorites = await getLocalFavorites();
+  syncUsage.totalFavoritesAdded = Math.max(favorites.length, syncUsage.totalFavoritesAdded);
+  await saveSyncUsage(syncUsage);
+};
+
+// Track favorite removed in sync storage
+export const trackFavoriteRemoved = async (): Promise<void> => {
+  const syncUsage = await getSyncUsage();
+  const favorites = await getLocalFavorites();
+  syncUsage.totalFavoritesAdded = favorites.length;
+  await saveSyncUsage(syncUsage);
+};
+
+// Check if user can add more my domains (checks both local count and sync counter)
 export const canAddMyDomain = async (): Promise<{ allowed: boolean; current: number; max: number }> => {
   const isPro = await isProUser();
   if (isPro) return { allowed: true, current: 0, max: Infinity };
 
   const domains = await getMyDomains();
+  const syncUsage = await getSyncUsage();
+
+  // Use higher of local count or sync counter
+  const current = Math.max(domains.length, syncUsage.totalDomainsAdded);
   return {
-    allowed: domains.length < FREE_LIMITS.maxMyDomains,
-    current: domains.length,
+    allowed: current < FREE_LIMITS.maxMyDomains,
+    current,
     max: FREE_LIMITS.maxMyDomains,
   };
+};
+
+// Track domain added in sync storage
+export const trackDomainAdded = async (): Promise<void> => {
+  const syncUsage = await getSyncUsage();
+  const domains = await getMyDomains();
+  syncUsage.totalDomainsAdded = Math.max(domains.length, syncUsage.totalDomainsAdded);
+  await saveSyncUsage(syncUsage);
 };
 
 // Export storage keys for external use (hooks)

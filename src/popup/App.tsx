@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { GenerateTab } from '../components/GenerateTab';
 import { FavoritesTab } from '../components/FavoritesTab';
@@ -9,11 +9,20 @@ import { createCheckoutSession } from '../services/lemonsqueezy';
 type Tab = 'generate' | 'favorites' | 'mydomains' | 'settings';
 
 export const App: React.FC = () => {
-  const { user, isLoading: authLoading, login, logout, startPlanPolling } = useAuth();
+  const { user, isLoading: authLoading, login, logout, startPlanPolling, refresh: refreshUser } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('generate');
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [upgradeReason, setUpgradeReason] = useState<string>('');
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
+  const [showRefreshBanner, setShowRefreshBanner] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Auto-hide refresh banner when plan becomes lifetime
+  useEffect(() => {
+    if (user?.plan === 'lifetime' && showRefreshBanner) {
+      setShowRefreshBanner(false);
+    }
+  }, [user?.plan, showRefreshBanner]);
 
   // Global upgrade handler - can be called from any component
   const handleShowUpgrade = useCallback((reason?: string) => {
@@ -37,6 +46,7 @@ export const App: React.FC = () => {
       if (success && checkoutUrl) {
         window.open(checkoutUrl, '_blank');
         setShowUpgradeModal(false);
+        setShowRefreshBanner(true);
         // Start polling for plan update after checkout
         startPlanPolling();
       } else {
@@ -256,6 +266,25 @@ export const App: React.FC = () => {
         </div>
       )}
 
+      {/* Refresh Banner - shown after checkout */}
+      {showRefreshBanner && user?.plan !== 'lifetime' && (
+        <div className="flex-none bg-gradient-to-r from-amber-50 to-yellow-50 border-b border-amber-200 px-4 py-2">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-amber-800">Completed payment? Tap to activate your plan.</p>
+            <button
+              onClick={async () => {
+                setIsRefreshing(true);
+                await refreshUser();
+                setIsRefreshing(false);
+              }}
+              disabled={isRefreshing}
+              className="px-3 py-1 text-xs font-semibold bg-amber-500 text-white rounded-full hover:bg-amber-600 transition-colors disabled:opacity-50"
+            >
+              {isRefreshing ? 'Checking...' : 'Refresh'}
+            </button>
+          </div>
+        </div>
+      )}
       {/* Header - FIXED */}
       <header className="flex-none bg-white border-b border-gray-200 px-4 py-3">
         <div className="flex items-center justify-between">

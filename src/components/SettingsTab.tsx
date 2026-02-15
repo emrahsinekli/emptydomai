@@ -296,166 +296,194 @@ export const SettingsTab: React.FC<SettingsTabProps> = ({ onLogout, onLogin, isA
         </div>
       )}
 
-      {/* Default AI Providers Section */}
-      <div className="p-4 border-b border-gray-200">
-        <button
-          onClick={() => toggleSection('defaults')}
-          className="w-full flex items-center justify-between mb-3"
-        >
-          <h3 className="font-medium text-gray-900">Default AI Providers</h3>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className={`w-4 h-4 transition-transform ${expandedSections.defaults ? 'rotate-180' : ''}`}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-
-        {expandedSections.defaults && (
-          <div className="space-y-4">
-            {/* Domain Generation Provider */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Domain Generation AI
-              </label>
-              <p className="text-xs text-gray-500 mb-2">Used to generate domain name suggestions</p>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={domainProvider}
-                  onChange={(e) => setDomainProvider(e.target.value as AIProvider)}
-                  className="input-field text-sm"
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                  <option value="gemini">Gemini</option>
-                  <option value="groq">Groq</option>
-                </select>
-                <select
-                  value={domainModel}
-                  onChange={(e) => setDomainModel(e.target.value)}
-                  className="input-field text-sm"
-                >
-                  {availableModels.map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              {!apiKeys[domainProvider] && (
-                <p className="text-xs text-amber-600 mt-1">
-                  API key not configured for {domainProvider}
-                </p>
-              )}
-            </div>
-
-            {/* Logo Generation Provider */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Logo Generation AI
-              </label>
-              <p className="text-xs text-gray-500 mb-2">Used to generate logo images</p>
-              <select
-                value={logoProvider}
-                onChange={(e) => setLogoProvider(e.target.value as ImageAIProvider)}
-                className="input-field text-sm"
-              >
-                <option value="openai">OpenAI DALL-E</option>
-                <option value="gemini">Google Imagen 3</option>
-                <option value="stability">Stability AI (Stable Diffusion)</option>
-                <option value="replicate">Replicate (Flux)</option>
-                <option value="leonardo">Leonardo AI</option>
-                <option value="fal">Fal.ai (Fast Flux)</option>
-                <option value="together">Together AI</option>
-              </select>
-              {!hasLogoProviderKey() && (
-                <p className="text-xs text-amber-600 mt-1">
-                  API key not configured for {logoProvider === 'openai' ? 'OpenAI' : logoProvider}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Text AI API Keys Section */}
-      <div className="p-4 border-b border-gray-200">
-        <button
-          onClick={() => toggleSection('textAI')}
-          className="w-full flex items-center justify-between mb-3"
-        >
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-gray-900">Text AI Keys</h3>
-            <span className="text-xs text-gray-500">
-              {getConfiguredCount()}/{TEXT_PROVIDER_CONFIGS.length}
-            </span>
-          </div>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className={`w-4 h-4 transition-transform ${expandedSections.textAI ? 'rotate-180' : ''}`}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
-
-        {expandedSections.textAI && (
-          <div className="space-y-4">
-            <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3 inline mr-1">
+      {/* AI Settings - Locked for Free Users */}
+      {user?.plan !== 'lifetime' ? (
+        <div className="p-4 border-b border-gray-200">
+          <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <div className="flex items-center gap-2 mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 text-gray-400">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
               </svg>
-              Keys stored locally, never sent to servers.
+              <h3 className="font-medium text-gray-900">AI Features</h3>
+              <span className="text-[10px] font-bold bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full">LIFETIME</span>
             </div>
-            {TEXT_PROVIDER_CONFIGS.map(renderAPIKeyInput)}
+            <p className="text-xs text-gray-500 mb-1">Upgrade to use your own AI API keys:</p>
+            <ul className="text-xs text-gray-500 space-y-0.5 mb-3 ml-3">
+              <li>AI domain name generation (OpenAI, Claude, Gemini, Groq)</li>
+              <li>AI logo generation (DALL-E, Stable Diffusion, Flux)</li>
+            </ul>
+            <button
+              onClick={() => onUpgrade?.('Upgrade to use AI-powered domain generation and logo creation with your own API keys.')}
+              className="w-full py-2 text-sm font-semibold bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-lg hover:from-primary-700 hover:to-primary-800 transition-all shadow-sm"
+            >
+              Unlock AI Features — $29
+            </button>
           </div>
-        )}
-      </div>
+        </div>
+      ) : (
+        <>
+          {/* Default AI Providers Section */}
+          <div className="p-4 border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('defaults')}
+              className="w-full flex items-center justify-between mb-3"
+            >
+              <h3 className="font-medium text-gray-900">Default AI Providers</h3>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className={`w-4 h-4 transition-transform ${expandedSections.defaults ? 'rotate-180' : ''}`}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
 
-      {/* Image AI API Keys Section */}
-      <div className="p-4 border-b border-gray-200">
-        <button
-          onClick={() => toggleSection('imageAI')}
-          className="w-full flex items-center justify-between mb-3"
-        >
-          <div className="flex items-center gap-2">
-            <h3 className="font-medium text-gray-900">Image AI Keys</h3>
-            <span className="text-xs text-gray-500">(Logo Generation)</span>
-          </div>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            strokeWidth={2}
-            stroke="currentColor"
-            className={`w-4 h-4 transition-transform ${expandedSections.imageAI ? 'rotate-180' : ''}`}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
-          </svg>
-        </button>
+            {expandedSections.defaults && (
+              <div className="space-y-4">
+                {/* Domain Generation Provider */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Domain Generation AI
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Used to generate domain name suggestions</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={domainProvider}
+                      onChange={(e) => setDomainProvider(e.target.value as AIProvider)}
+                      className="input-field text-sm"
+                    >
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic</option>
+                      <option value="gemini">Gemini</option>
+                      <option value="groq">Groq</option>
+                    </select>
+                    <select
+                      value={domainModel}
+                      onChange={(e) => setDomainModel(e.target.value)}
+                      className="input-field text-sm"
+                    >
+                      {availableModels.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {!apiKeys[domainProvider] && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      API key not configured for {domainProvider}
+                    </p>
+                  )}
+                </div>
 
-        {expandedSections.imageAI && (
-          <div className="space-y-4">
-            <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
-              Configure additional image AI providers. OpenAI DALL-E uses the same key as text AI.
-            </div>
-            {IMAGE_PROVIDER_CONFIGS.map(renderAPIKeyInput)}
+                {/* Logo Generation Provider */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Logo Generation AI
+                  </label>
+                  <p className="text-xs text-gray-500 mb-2">Used to generate logo images</p>
+                  <select
+                    value={logoProvider}
+                    onChange={(e) => setLogoProvider(e.target.value as ImageAIProvider)}
+                    className="input-field text-sm"
+                  >
+                    <option value="openai">OpenAI DALL-E</option>
+                    <option value="gemini">Google Imagen 3</option>
+                    <option value="stability">Stability AI (Stable Diffusion)</option>
+                    <option value="replicate">Replicate (Flux)</option>
+                    <option value="leonardo">Leonardo AI</option>
+                    <option value="fal">Fal.ai (Fast Flux)</option>
+                    <option value="together">Together AI</option>
+                  </select>
+                  {!hasLogoProviderKey() && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      API key not configured for {logoProvider === 'openai' ? 'OpenAI' : logoProvider}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+          {/* Text AI API Keys Section */}
+          <div className="p-4 border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('textAI')}
+              className="w-full flex items-center justify-between mb-3"
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium text-gray-900">Text AI Keys</h3>
+                <span className="text-xs text-gray-500">
+                  {getConfiguredCount()}/{TEXT_PROVIDER_CONFIGS.length}
+                </span>
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className={`w-4 h-4 transition-transform ${expandedSections.textAI ? 'rotate-180' : ''}`}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {expandedSections.textAI && (
+              <div className="space-y-4">
+                <div className="p-2 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-700">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-3 h-3 inline mr-1">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                  Keys stored locally, never sent to servers.
+                </div>
+                {TEXT_PROVIDER_CONFIGS.map(renderAPIKeyInput)}
+              </div>
+            )}
+          </div>
+
+          {/* Image AI API Keys Section */}
+          <div className="p-4 border-b border-gray-200">
+            <button
+              onClick={() => toggleSection('imageAI')}
+              className="w-full flex items-center justify-between mb-3"
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium text-gray-900">Image AI Keys</h3>
+                <span className="text-xs text-gray-500">(Logo Generation)</span>
+              </div>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className={`w-4 h-4 transition-transform ${expandedSections.imageAI ? 'rotate-180' : ''}`}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+              </svg>
+            </button>
+
+            {expandedSections.imageAI && (
+              <div className="space-y-4">
+                <div className="p-2 bg-purple-50 border border-purple-200 rounded-lg text-xs text-purple-700">
+                  Configure additional image AI providers. OpenAI DALL-E uses the same key as text AI.
+                </div>
+                {IMAGE_PROVIDER_CONFIGS.map(renderAPIKeyInput)}
+              </div>
+            )}
+          </div>
+        </>
+      )}
 
       {/* About Section */}
       <div className="p-4 border-b border-gray-200">
         <h3 className="font-medium text-gray-900 mb-3">About</h3>
         <div className="space-y-2 text-sm text-gray-600">
-          <p><strong>EmptyDomai</strong> v1.2.0</p>
+          <p><strong>EmptyDomai</strong> v1.3.0</p>
           <p>AI-powered domain name generator</p>
           <p className="text-xs text-gray-400">
             Generate smart domain names, check availability in real-time, and save your favorites.
